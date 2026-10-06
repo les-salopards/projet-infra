@@ -8,14 +8,15 @@ Le code des features Rallly vit dans le fork [`les-salopards/rallly`](https://gi
 Prérequis : Docker avec Compose v2, `openssl`, ports 80 et 443 libres.
 
 ```bash
-cp .env.example .env
+[ -f .env ] || cp .env.example .env   # never overwrite an existing .env
+# Fills only empty secrets: safe to re-run, existing values are kept
 sed -i \
-  -e "s|^RALLLY_SECRET_PASSWORD=.*|RALLLY_SECRET_PASSWORD=$(openssl rand -base64 32)|" \
-  -e "s|^RALLLY_DB_PASSWORD=.*|RALLLY_DB_PASSWORD=$(openssl rand -hex 24)|" \
-  -e "s|^AUTHENTIK_SECRET_KEY=.*|AUTHENTIK_SECRET_KEY=$(openssl rand -base64 60 | tr -d '\n')|" \
-  -e "s|^AUTHENTIK_DB_PASSWORD=.*|AUTHENTIK_DB_PASSWORD=$(openssl rand -hex 24)|" \
-  -e "s|^AUTHENTIK_BOOTSTRAP_PASSWORD=.*|AUTHENTIK_BOOTSTRAP_PASSWORD=$(openssl rand -base64 18)|" \
-  -e "s|^MAILPIT_UI_AUTH=.*|MAILPIT_UI_AUTH=admin:$(openssl rand -hex 12)|" \
+  -e "s|^RALLLY_SECRET_PASSWORD=$|RALLLY_SECRET_PASSWORD=$(openssl rand -base64 32)|" \
+  -e "s|^RALLLY_DB_PASSWORD=$|RALLLY_DB_PASSWORD=$(openssl rand -hex 24)|" \
+  -e "s|^AUTHENTIK_SECRET_KEY=$|AUTHENTIK_SECRET_KEY=$(openssl rand -base64 60 | tr -d '\n')|" \
+  -e "s|^AUTHENTIK_DB_PASSWORD=$|AUTHENTIK_DB_PASSWORD=$(openssl rand -hex 24)|" \
+  -e "s|^AUTHENTIK_BOOTSTRAP_PASSWORD=$|AUTHENTIK_BOOTSTRAP_PASSWORD=$(openssl rand -base64 18)|" \
+  -e "s|^MAILPIT_UI_AUTH=$|MAILPIT_UI_AUTH=admin:$(openssl rand -hex 12)|" \
   .env
 docker compose up -d --wait --wait-timeout 300   # ~2 min au premier démarrage
 scripts/smoke.sh                                 # vérifie toute la stack

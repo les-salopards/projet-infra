@@ -17,8 +17,9 @@ CA=$(mktemp); trap 'rm -f "$CA"' EXIT
 # HTTP status of https://<host><path>, trusting Caddy's local CA
 code() {
   local host=$1 path=$2; shift 2
-  curl -s -o /dev/null -w '%{http_code}' --max-time 10 --cacert "$CA" \
-    --resolve "$host:443:$IP" "$@" "https://$host$path"
+  # curl prints 000 when it cannot connect; never let set -e end the script without a FAIL line
+  curl -sS -o /dev/null -w '%{http_code}' --max-time 10 --cacert "$CA" \
+    --resolve "$host:443:$IP" "$@" "https://$host$path" || true
 }
 # HTTPS request to <url> from inside the rallly container. Any HTTP answer passes:
 # the check is DNS (network alias -> caddy) + TLS trust of Caddy's CA, both needed by OIDC in J2.
@@ -26,6 +27,19 @@ hairpin() {
   docker compose exec -T rallly node -e '
     fetch(process.argv[1]).catch(e => { console.error(e.cause?.code || e.message); process.exit(1) })' "$1"
 }
+
+echo "== readme setup block"
+# Re-running README's "Démarrage" block must keep an existing .env: regenerating secrets after
+# the databases are initialised breaks every login. Runs the block's cp/sed lines twice offline.
+tmp=$(mktemp -d)
+cp .env.example "$tmp/"
+setup=$(sed -n '/^## Démarrage/,/^## /p' README.md | sed -n '/cp .env.example .env/,/^  \.env$/p')
+[ -n "$setup" ] || fail "README Démarrage block not found"
+(cd "$tmp" && eval "$setup" && cp .env first && eval "$setup") >/dev/null 2>&1 || fail "README setup block errors"
+grep -q '^RALLLY_DB_PASSWORD=.' "$tmp/.env" || fail "README setup block leaves RALLLY_DB_PASSWORD empty"
+cmp -s "$tmp/first" "$tmp/.env" || fail "re-running README setup block changes existing secrets"
+rm -rf "$tmp"
+ok "README setup block fills secrets once and is safe to re-run"
 
 echo "== env guard"
 out=$(docker compose --env-file .env.example config -q 2>&1) \
@@ -47,7 +61,7 @@ ok "only 80,443 published"
 docker compose exec -T caddy cat /data/caddy/pki/authorities/local/root.crt >"$CA"
 grep -q "BEGIN CERTIFICATE" "$CA" || fail "could not read Caddy root CA"
 
-c=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 --resolve "mail.$DOMAIN:80:$IP" "http://mail.$DOMAIN/")
+c=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 --resolve "mail.$DOMAIN:80:$IP" "http://mail.$DOMAIN/" || true)
 [ "$c" = 308 ] || fail "http://mail.$DOMAIN -> $c, expected 308 redirect to https"
 ok "http redirects to https"
 
