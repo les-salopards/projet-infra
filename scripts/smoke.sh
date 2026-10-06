@@ -57,4 +57,15 @@ c=$(code "mail.$DOMAIN" /api/v1/messages); [ "$c" = 401 ] || fail "mailpit API w
 c=$(code "mail.$DOMAIN" / -u "$(val MAILPIT_UI_AUTH)"); [ "$c" = 200 ] || fail "mailpit UI with auth -> $c, expected 200"
 ok "mailpit UI and API locked behind basic auth"
 
+echo "== rallly"
+c=$(code "rallly.$DOMAIN" /api/status); [ "$c" = 200 ] || fail "rallly /api/status -> $c, expected 200"
+ok "rallly answers through caddy"
+hairpin "https://mail.$DOMAIN/readyz" || fail "rallly container cannot reach https://mail.$DOMAIN (alias or CA trust)"
+ok "rallly container trusts caddy CA and resolves public hostnames"
+
+echo "== isolation"
+docker compose exec -T caddy getent hosts mailpit >/dev/null || fail "isolation probe broken: caddy cannot resolve mailpit"
+docker compose exec -T caddy getent hosts rallly-db >/dev/null && fail "rallly-db is reachable from the edge network"
+ok "rallly-db only on its internal network"
+
 echo "smoke: all checks passed"

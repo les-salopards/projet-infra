@@ -27,6 +27,20 @@ services:
       timeout: 3s
       retries: 12
 
+  # One-shot: Caddy keeps its PKI root-only (0600) next to the CA private key.
+  # Copy only the public root cert into its own volume, readable by app users.
+  caddy-ca:
+    image: caddy:${CADDY_TAG:-2.11.7-alpine}
+    restart: "no"
+    network_mode: none
+    command: ["install", "-m", "0644", "/data/caddy/pki/authorities/local/root.crt", "/caddy-ca/root.crt"]
+    volumes:
+      - caddy-data:/data:ro
+      - caddy-ca:/caddy-ca
+    depends_on:
+      caddy:
+        condition: service_healthy
+
   mailpit:
     image: axllent/mailpit:${MAILPIT_TAG:-v1.31.4}
     restart: unless-stopped
@@ -36,9 +50,57 @@ services:
     networks:
       - edge
 
+  rallly:
+    image: ${RALLLY_IMAGE:-lukevella/rallly:4.15.4}
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_BASE_URL: https://rallly.${DOMAIN:-localhost}
+      SECRET_PASSWORD: ${RALLLY_SECRET_PASSWORD:?set RALLLY_SECRET_PASSWORD in .env (min 32 chars)}
+      DATABASE_URL: postgres://rallly:${RALLLY_DB_PASSWORD:?set RALLLY_DB_PASSWORD in .env}@rallly-db:5432/rallly
+      SUPPORT_EMAIL: ${SUPPORT_EMAIL:-support@lab.test}
+      NOREPLY_EMAIL: noreply@lab.test
+      INITIAL_ADMIN_EMAIL: ${RALLLY_ADMIN_EMAIL:-admin@lab.test}
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_SECURE: "false"
+      # Trust Caddy's local CA for server-side calls (OIDC discovery in J2). Read once at startup.
+      NODE_EXTRA_CA_CERTS: /caddy-ca/root.crt
+    volumes:
+      - caddy-ca:/caddy-ca:ro
+    networks:
+      - edge
+      - rallly-db
+    depends_on:
+      rallly-db:
+        condition: service_healthy
+      caddy-ca:
+        condition: service_completed_successfully
+
+  rallly-db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rallly
+      POSTGRES_PASSWORD: ${RALLLY_DB_PASSWORD:?set RALLLY_DB_PASSWORD in .env}
+      POSTGRES_DB: rallly
+    volumes:
+      # postgres >= 18 expects the volume at /var/lib/postgresql (not .../data)
+      - rallly-db-data:/var/lib/postgresql
+    networks:
+      - rallly-db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rallly -d rallly"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 networks:
   edge:
+  rallly-db:
+    internal: true
 
 volumes:
   caddy-data:
   caddy-config:
+  caddy-ca:
+  rallly-db-data:
