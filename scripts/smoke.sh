@@ -68,4 +68,27 @@ docker compose exec -T caddy getent hosts mailpit >/dev/null || fail "isolation 
 docker compose exec -T caddy getent hosts rallly-db >/dev/null && fail "rallly-db is reachable from the edge network"
 ok "rallly-db only on its internal network"
 
+echo "== authentik"
+c=$(code "auth.$DOMAIN" /-/health/live/); [[ "$c" == 2?? ]] || fail "authentik health -> $c, expected 2xx"
+ok "authentik answers through caddy"
+hairpin "https://auth.$DOMAIN/-/health/live/" || fail "rallly container cannot reach https://auth.$DOMAIN (OIDC in J2 will fail)"
+ok "rallly container reaches authentik over https (OIDC-ready)"
+docker compose exec -T caddy getent hosts authentik-db >/dev/null && fail "authentik-db is reachable from the edge network"
+ok "authentik-db only on its internal network"
+
+echo "== mail from authentik"
+to="smoke-$(date +%s)@lab.test" # unique per run: mails left in mailpit by earlier runs must not count
+# On a fresh install the worker can still be busy with first-boot tasks: ak then gives up waiting
+# for the result (ResultTimeout) while the mail stays queued. The inbox is the real check.
+out=$(docker compose exec -T authentik-worker ak test_email "$to" 2>&1) \
+  || grep -q ResultTimeout <<<"$out" || fail "ak test_email failed: $(tail -n 3 <<<"$out")"
+got=
+for _ in $(seq 1 30); do
+  curl -s --max-time 10 --cacert "$CA" --resolve "mail.$DOMAIN:443:$IP" -u "$(val MAILPIT_UI_AUTH)" \
+    "https://mail.$DOMAIN/api/v1/search?query=to:$to" | grep -q '"messages_count":[1-9]' && { got=1; break; }
+  sleep 3
+done
+[ -n "$got" ] || fail "no mail to $to in mailpit after 90s"
+ok "authentik mail captured by mailpit"
+
 echo "smoke: all checks passed"
