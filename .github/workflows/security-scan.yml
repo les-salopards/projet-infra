@@ -1,0 +1,60 @@
+# Scan de sécurité réutilisable : le même ./scripts/scan.sh qu'en local.
+# Appelé par la CI principale après le build/push de l'image :
+#
+#   jobs:
+#     scan:
+#       needs: build
+#       uses: ./.github/workflows/security-scan.yml
+#       with:
+#         images: ghcr.io/les-salopards/rallly:${{ github.sha }}
+#
+# Sans `images`, scanne toutes les images du Compose.
+name: security-scan
+
+on:
+  workflow_call:
+    inputs:
+      images:
+        description: Images à scanner, séparées par des espaces (vide = images du Compose)
+        type: string
+        default: ""
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1" # chaque lundi : nouvelles CVE sur des images inchangées
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # gitleaks parcourt tout l'historique
+
+      - name: Connexion à GHCR (images privées éventuelles)
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Cache base de CVE Trivy
+        uses: actions/cache@v4
+        with:
+          path: .trivy-cache
+          key: trivy-db-${{ github.run_id }}
+          restore-keys: trivy-db-
+
+      - name: Scan
+        env:
+          IMAGES: ${{ inputs.images }}
+        run: |
+          [ -f .env ] || cp .env.example .env 2>/dev/null || true
+          # shellcheck disable=SC2086
+          ./scripts/scan.sh $IMAGES
+
+      - name: Rapports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: reports/
