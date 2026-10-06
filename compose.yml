@@ -1,0 +1,44 @@
+name: rallly-lab
+
+services:
+  caddy:
+    image: caddy:${CADDY_TAG:-2.11.7-alpine}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      edge:
+        # Containers resolve the public hostnames to caddy, so server-side calls
+        # (Rallly -> Authentik OIDC discovery) use the same URLs as the browser.
+        aliases:
+          - rallly.${DOMAIN:-localhost}
+          - auth.${DOMAIN:-localhost}
+          - mail.${DOMAIN:-localhost}
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /data/caddy/pki/authorities/local/root.crt"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  mailpit:
+    image: axllent/mailpit:${MAILPIT_TAG:-v1.31.4}
+    restart: unless-stopped
+    environment:
+      # Anyone reading Mailpit can use any Rallly magic link: always lock the UI/API
+      MP_UI_AUTH: ${MAILPIT_UI_AUTH:?set MAILPIT_UI_AUTH in .env (user:password)}
+    networks:
+      - edge
+
+networks:
+  edge:
+
+volumes:
+  caddy-data:
+  caddy-config:

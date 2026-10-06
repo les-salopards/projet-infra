@@ -1,0 +1,18 @@
+{
+	# Sign every site with Caddy's own local CA (no public domain locally nor on the campus VM)
+	local_certs
+	# Running in a container: never try to touch a system trust store
+	skip_install_trust
+}
+
+rallly.{$DOMAIN} {
+	reverse_proxy rallly:3000
+}
+
+auth.{$DOMAIN} {
+	reverse_proxy authentik-server:9000
+}
+
+mail.{$DOMAIN} {
+	reverse_proxy mailpit:8025
+}
