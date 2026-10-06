@@ -27,7 +27,7 @@ Un `.env` incomplet fait échouer `docker compose up` avec le nom de la variable
 
 | Service | URL | Compte |
 |---|---|---|
-| Rallly | https://rallly.localhost | `admin@lab.test`, par magic link lu dans Mailpit |
+| Rallly | https://rallly.localhost | `admin@lab.test`, par code de connexion lu dans Mailpit, puis https://rallly.localhost/admin-setup → « Make me an admin » |
 | Authentik | https://auth.localhost | `akadmin` / `AUTHENTIK_BOOTSTRAP_PASSWORD` du `.env` |
 | Mailpit (SMTP de lab) | https://mail.localhost | `MAILPIT_UI_AUTH` du `.env` (`user:password`) |
 
@@ -82,6 +82,7 @@ La CA vit dans le volume `caddy-data`. Si ce volume est supprimé (`docker compo
 
 ## Pièges rencontrés
 
+- **Admin Rallly pas automatique** : `INITIAL_ADMIN_EMAIL` ne donne pas le rôle admin à la connexion. Il autorise seulement cette adresse à le réclamer sur `/admin-setup`.
 - **Adresses `@localhost` refusées par Rallly** : son formulaire de login exige un TLD. Toutes les adresses de lab sont donc en `@lab.test`.
 - **CA de Caddy illisible par Rallly** : Caddy crée sa PKI en `0600` root. D'où le service `caddy-ca`, qui copie uniquement `root.crt`.
 - **Variables bootstrap d'Authentik** : lues au premier démarrage seulement. Pour changer le mot de passe d'`akadmin`, passer par l'UI, ou `docker compose down -v` (efface toutes les données).

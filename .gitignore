@@ -1,3 +1,4 @@
 .env
 caddy-root.crt
 .claude/settings.local.json
+.gstack/
