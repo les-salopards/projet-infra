@@ -27,6 +27,18 @@ Tests : 7 tests Vitest (`group-access/utils.test.ts`, `oidc-vote/utils.test.ts`)
 - Réglage au niveau de l'instance, pas par sondage : en démo, tous les sondages exigent un compte.
 - Les votes déjà enregistrés en invité avant activation restent tels quels.
 - L'identité est celle de la dernière connexion : un changement de nom dans Authentik s'applique aux réponses suivantes.
+- Un même compte peut encore ajouter plusieurs réponses (bouton « + » de Rallly) : chacune porte son identité IdP,
+  donc c'est visible, mais pas bloqué. Piste : refuser une 2e réponse du même `userId` dans `addParticipantAction`.
+
+## Vérifié (16/11/2026, image du fork, stack locale)
+- Appel direct de l'action de vote en invité → `{"ok":false,"reason":"loginRequired"}`.
+- Appel en `alice` avec `name: "Faux nom"`, `email: "faux@example.com"` → réponse enregistrée sous
+  `Alice (utilisatrice)` / `alice@example.com`, liée à son compte.
+- Renommage en `alice` → `FORBIDDEN`.
+
+| Non connecté | Connectée via Authentik |
+| --- | --- |
+| ![Invité](../img/feature1-invite-non-connecte.png) | ![Alice](../img/feature1-connecte-identite-idp.png) |
 
 ## Scénario de démo (2 min)
 1. Navigation privée, lien d'un sondage → bandeau « Connectez-vous pour répondre », pas de formulaire de vote.
