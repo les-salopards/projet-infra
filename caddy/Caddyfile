@@ -1,0 +1,20 @@
+{
+	# Non-root : Caddy ne peut pas installer sa CA dans le trust store du conteneur (sans effet)
+	skip_install_trust
+}
+
+# Pas d'IP publique (local et VM Énov) : certificats émis par la CA interne de Caddy
+auth.{$DOMAIN} {
+	tls internal
+	reverse_proxy authentik-server:9000
+}
+
+rallly.{$DOMAIN} {
+	tls internal
+	reverse_proxy rallly:3000
+}
+
+mail.{$DOMAIN} {
+	tls internal
+	reverse_proxy mailpit:8025
+}
