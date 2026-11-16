@@ -22,6 +22,8 @@ et `EMAIL_LOGIN_ENABLED=false` : la page de login redirige directement vers Auth
 **Démo** : ouvrir `https://rallly.<DOMAIN>` → redirection vers Authentik → `alice` + mot de passe → retour dans Rallly, connectée
 avec le nom et l'e-mail venant d'Authentik.
 
+![Login Authentik pour Rallly](img/sso-authentik-login.png)
+
 ### Pièges rencontrés
 - **Redirect URI** : Rallly (Better Auth) envoie `/api/auth/callback/oidc`, pas `/api/better-auth/...`. Elle doit correspondre
   exactement à `NEXT_PUBLIC_BASE_URL` : sur la VM, c'est le `DOMAIN` du `.env` qui la fait changer.
@@ -42,8 +44,10 @@ avec le nom et l'e-mail venant d'Authentik.
 Deux *policy bindings* de groupe sur l'application `rallly` (mode `any`) : il suffit d'être dans l'un des deux groupes.
 Le refus a lieu dans Authentik, avant tout retour vers Rallly : aucun compte n'est créé côté Rallly.
 
-**Démo** : se connecter à Rallly en `charlie` → page Authentik « Permission denied ». En `bob`, montrer en plus l'accès
+**Démo** : se connecter à Rallly en `charlie` → page Authentik « Permission refusée ». En `bob`, montrer en plus l'accès
 à l'admin Authentik, que `alice` n'a pas.
+
+![charlie refusé](img/policy-charlie-refuse.png)
 
 ## 3. Invitation d'un utilisateur externe
 
