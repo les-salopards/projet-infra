@@ -140,6 +140,8 @@ services:
       OIDC_DISCOVERY_URL: https://auth.${DOMAIN}/application/o/rallly/.well-known/openid-configuration
       OIDC_CLIENT_ID: rallly
       OIDC_CLIENT_SECRET: ${RALLLY_OIDC_CLIENT_SECRET}
+      # Feature #1 (image du fork) : vote réservé aux comptes OIDC, sous l'identité de l'IdP
+      OIDC_VOTE_REQUIRED: "true"
       # Lu une seule fois au lancement de Node, d'où la dépendance sur caddy-ca
       NODE_EXTRA_CA_CERTS: /caddy-ca/root.crt
     volumes:
