@@ -21,7 +21,7 @@ x-postgres: &postgres
 
 x-authentik: &authentik
   <<: *hardening
-  image: ghcr.io/goauthentik/server:2026.8.3
+  image: ghcr.io/goauthentik/server:2026.8.5
   shm_size: 512mb
   # Rien n'est écrit hors de /data (volume) et /dev/shm (shm_size) : testé SSO, policies, blueprint, e-mail
   read_only: true
