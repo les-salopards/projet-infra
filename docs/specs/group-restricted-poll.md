@@ -37,9 +37,10 @@ Pas de colonne ajoutée sur `users` : les groupes sont relus depuis l'ID token, 
 - Les commentaires ne sont pas restreints (ils sont désactivés par défaut dans Rallly).
 
 ## Intégration avec la #1 (Raph)
-La #1 verrouille le vote derrière une session OIDC. La règle de groupe est isolée dans `getPollGroupAccess()` :
-quand la fonction serveur commune « peut voter ? » de la #1 est mergée, elle appelle cette fonction
-et les deux contrôles des actions de vote fusionnent en un seul appel.
+La #1 verrouille le vote derrière une session OIDC. Les deux features partagent **une seule règle « peut voter ? »** :
+`evaluateGroupAccess` (`features/poll/group-access/utils.ts`) reçoit en plus `oidcRequired` (PR #1 du fork, construite
+sur cette branche). Les actions de vote font donc un seul contrôle, qui couvre l'exigence OIDC et l'appartenance au groupe.
+Ordre de merge dans le fork : `feat/group-restricted-poll`, puis `feat/oauth-locked-vote`.
 
 ## Scénario de démo (2 min)
 Comptes Authentik : `alice` (groupe `rallly-users`), `bob` (groupe `rallly-admins` uniquement).
