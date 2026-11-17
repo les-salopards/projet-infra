@@ -3,7 +3,7 @@
 #   ./scripts/scan.sh                 # images du Compose + durcissement du Compose + Dockerfiles + secrets
 #   ./scripts/scan.sh image1 image2   # seulement ces images
 # Rapports : reports/ (gitignoré). Commentaires des résultats : docs/security.md.
-# Code de sortie ≠ 0 si une CVE CRITICAL corrigeable non acceptée (.trivyignore), une règle de durcissement
+# Code de sortie ≠ 0 si une CVE CRITICAL corrigeable non acceptée (.trivyignore.yaml), une règle de durcissement
 # violée ou un secret est trouvé (utilisable en CI).
 set -uo pipefail
 
@@ -40,9 +40,10 @@ for image in ${images[@]+"${images[@]}"}; do
   # Image publiée : on prend la dernière version. Image construite localement (CI) : on la garde.
   docker pull -q "$image" >/dev/null 2>&1 || docker image inspect "$image" >/dev/null 2>&1 \
     || { echo "   image introuvable : $image"; status=1; continue; }
-  trivy image --quiet --scanners vuln --ignore-unfixed --severity "$SEVERITY" \
+  # Risques acceptés : .trivyignore.yaml (chaque entrée limitée à un paquet, avec date d'expiration)
+  trivy image --quiet --scanners vuln --ignore-unfixed --severity "$SEVERITY" --ignorefile .trivyignore.yaml \
     --format table --output "/reports/image-${safe}.txt" "$image"
-  trivy image --quiet --scanners vuln --ignore-unfixed --severity "$SEVERITY" \
+  trivy image --quiet --scanners vuln --ignore-unfixed --severity "$SEVERITY" --ignorefile .trivyignore.yaml \
     --format json --output "/reports/image-${safe}.json" "$image"
   if [ ! -s "reports/image-${safe}.json" ]; then
     echo "   ERREUR : pas de rapport pour $image"; status=1; continue
@@ -59,8 +60,9 @@ done
 
 # trivy config ne sait pas lire un fichier Compose : les règles sont vérifiées sur le Compose résolu.
 echo "== Durcissement du Compose (scripts/check-compose.py)"
-if [ -f .env ] && docker compose config --format json > reports/compose.json 2>/dev/null; then
-  python3 scripts/check-compose.py < reports/compose.json || status=1
+# Le Compose résolu contient les secrets du .env : passé par un pipe, jamais écrit dans reports/ (publié par la CI).
+if [ -f .env ] && docker compose config --quiet 2>/dev/null; then
+  docker compose config --format json 2>/dev/null | python3 scripts/check-compose.py || status=1
 else
   echo "   ERREUR : docker compose config a échoué (.env complet ?)"; status=1
 fi

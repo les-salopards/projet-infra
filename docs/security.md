@@ -82,7 +82,7 @@ une règle de durcissement violée ou un secret est trouvé.
 **CI** : `.github/workflows/security-scan.yml` lance le même script à chaque push sur `main`, sur chaque PR et chaque lundi
 (nouvelles CVE sur des images inchangées). Les rapports sont joints au run. Le fork peut l'appeler après le build de son image.
 
-**Risques acceptés** : [`.trivyignore`](../.trivyignore) liste les CVE critiques jugées non exploitables, chacune avec une date
+**Risques acceptés** : [`.trivyignore.yaml`](../.trivyignore.yaml) liste les CVE critiques jugées non exploitables, **chacune limitée à son paquet** (chemin ou PURL : la même CVE ailleurs reste signalée) et avec une date
 d'expiration. Passé cette date, Trivy les signale à nouveau et la CI repasse au rouge, ce qui oblige à réévaluer.
 
 ### Résultats commentés — 17 nov. 2026 (Trivy 0.75.0, images de `compose.yml`)
@@ -96,7 +96,7 @@ CVE **corrigeables** de sévérité HIGH ou CRITICAL :
 | `lukevella/rallly:4.17` | 0 | 6 | `undici` 6.28.0, `brace-expansion` 5.0.9, **tous dans le CLI `npm` livré avec l'image** (`/usr/local/lib/node_modules/npm`) | **Hors du code applicatif.** Rallly n'importe pas ces copies ; `npm` ne sert qu'à `npx prisma migrate deploy` au démarrage, avec le Prisma déjà installé (aucun téléchargement). Piste pour l'image du fork : appeler `node_modules/.bin/prisma` directement et supprimer `npm` de l'étape `runner`. Les 3 CRITICAL `perl-base` du 6 oct. ont disparu de l'image upstream ; le fork garde son `apt-get upgrade` (branche `hardening/runner-image`) pour ne pas en dépendre. |
 | `ghcr.io/goauthentik/server:2026.8.5` | 1 | 70 | `libbrotli1` (C), `libpq5` (34 H), `aiohttp`, `urllib3`, `pyasn1`… | **Montée de version faite : 5 CRITICAL → 1.** Passer de `2026.8.3` à `2026.8.5` corrige PyJWT (contournement d'authentification), `certifi` (CA emSign compromises) et `anyio`. Reste `libbrotli1` (écriture hors limites dans le décodeur Brotli) : pas de correctif dans la dernière image publiée, **accepté jusqu'au 31/12/2026** car Authentik n'est joignable que via Caddy depuis le VPN Énov. `libpq5` : client Postgres, ne parle qu'à `authentik-db` sur un réseau `internal`. |
 
-Historique : au premier scan (6 oct., `2026.8.3` et Rallly upstream), il y avait 7 CRITICAL corrigeables ; il en reste 2, toutes deux justifiées dans `.trivyignore`.
+Historique : au premier scan (6 oct., `2026.8.3` et Rallly upstream), il y avait 7 CRITICAL corrigeables ; il en reste 2, toutes deux justifiées dans `.trivyignore.yaml`.
 
 Pour relancer : `./scripts/scan.sh` (toutes les images du Compose) ou `./scripts/scan.sh <image>`.
 
