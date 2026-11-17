@@ -1,0 +1,180 @@
+x-hardening: &hardening
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+  restart: unless-stopped
+  pids_limit: 256
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+x-postgres: &postgres
+  <<: *hardening
+  image: docker.io/library/postgres:18-alpine
+  user: postgres
+  read_only: true
+  tmpfs: ["/var/run/postgresql:uid=70,gid=70", /tmp]
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+    interval: 10s
+    retries: 5
+    start_period: 20s
+
+x-authentik: &authentik
+  <<: *hardening
+  image: ghcr.io/goauthentik/server:2026.8.3
+  shm_size: 512mb
+  environment:
+    AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?voir .env.example}
+    AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:?voir .env.example}
+    AUTHENTIK_BOOTSTRAP_EMAIL: admin@${DOMAIN}
+    AUTHENTIK_POSTGRESQL__HOST: authentik-db
+    AUTHENTIK_POSTGRESQL__NAME: authentik
+    AUTHENTIK_POSTGRESQL__USER: authentik
+    AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_DB_PASSWORD:?voir .env.example}
+    AUTHENTIK_EMAIL__HOST: mailpit
+    AUTHENTIK_EMAIL__PORT: 1025
+    AUTHENTIK_EMAIL__FROM: authentik@${DOMAIN}
+    AUTHENTIK_DISABLE_UPDATE_CHECK: "true"
+    AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+    # Lus par les blueprints (authentik/blueprints/) via !Env
+    DOMAIN: ${DOMAIN:?voir .env.example}
+    RALLLY_OIDC_CLIENT_SECRET: ${RALLLY_OIDC_CLIENT_SECRET:?voir .env.example}
+    DEMO_PASSWORD: ${DEMO_PASSWORD:?voir .env.example}
+  volumes:
+    - authentik-data:/data
+  depends_on:
+    authentik-db:
+      condition: service_healthy
+
+services:
+  caddy:
+    <<: *hardening
+    image: docker.io/library/caddy:2.11-alpine
+    user: "1000:1000"
+    cap_add: ["NET_BIND_SERVICE"]
+    read_only: true
+    ports: ["80:80", "443:443"] # les seuls ports publiés de la stack
+    environment:
+      DOMAIN: ${DOMAIN:?voir .env.example}
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    tmpfs: [/tmp]
+    healthcheck:
+      test: ["CMD", "test", "-f", "/data/caddy/pki/authorities/local/root.crt"]
+      interval: 5s
+      retries: 12
+    networks:
+      edge:
+        # Rallly joint Authentik par son URL publique : ce nom doit résoudre vers Caddy dans le réseau Docker
+        aliases: ["auth.${DOMAIN}"]
+
+  # One-shot : publie le seul certificat racine de la CA Caddy pour Rallly (la clé privée reste dans caddy-data, en 0600)
+  caddy-ca:
+    <<: *hardening
+    image: docker.io/library/caddy:2.11-alpine
+    restart: "no"
+    user: root
+    cap_add: ["DAC_OVERRIDE"] # lire root.crt (0600, uid 1000) ; rien d'autre
+    read_only: true
+    network_mode: none
+    command: ["sh", "-c", "cp /data/caddy/pki/authorities/local/root.crt /ca/root.crt && chmod 644 /ca/root.crt"]
+    volumes:
+      - caddy-data:/data:ro
+      - caddy-ca:/ca
+    depends_on:
+      caddy:
+        condition: service_healthy
+
+  authentik-db:
+    <<: *postgres
+    environment:
+      POSTGRES_DB: authentik
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: ${AUTHENTIK_DB_PASSWORD:?voir .env.example}
+    volumes:
+      - authentik-db:/var/lib/postgresql
+    networks: [authentik-internal]
+
+  authentik-server:
+    <<: *authentik
+    command: server
+    networks: [edge, authentik-internal]
+
+  authentik-worker:
+    <<: *authentik
+    command: worker
+    # Ni user: root ni docker.sock (le compose officiel les met pour les outposts Docker, inutiles ici)
+    volumes:
+      - authentik-data:/data
+      - ./authentik/blueprints:/blueprints/custom:ro
+    networks: [edge, authentik-internal]
+
+  rallly-db:
+    <<: *postgres
+    environment:
+      POSTGRES_DB: rallly
+      POSTGRES_USER: rallly
+      POSTGRES_PASSWORD: ${RALLLY_DB_PASSWORD:?voir .env.example}
+    volumes:
+      - rallly-db:/var/lib/postgresql
+    networks: [rallly-internal]
+
+  rallly:
+    <<: *hardening
+    image: ${RALLLY_IMAGE:-docker.io/lukevella/rallly:4.17}
+    environment:
+      DATABASE_URL: postgres://rallly:${RALLLY_DB_PASSWORD}@rallly-db:5432/rallly
+      SECRET_PASSWORD: ${RALLLY_SECRET_PASSWORD:?voir .env.example}
+      NEXT_PUBLIC_BASE_URL: https://rallly.${DOMAIN}
+      SUPPORT_EMAIL: ${SUPPORT_EMAIL:?voir .env.example}
+      NOREPLY_EMAIL: ${SUPPORT_EMAIL}
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_SECURE: "false"
+      # Connexion uniquement via Authentik ; REGISTRATION_ENABLED reste à true pour créer le compte au 1er SSO
+      EMAIL_LOGIN_ENABLED: "false"
+      REGISTRATION_ENABLED: "true"
+      OIDC_NAME: Authentik
+      OIDC_DISCOVERY_URL: https://auth.${DOMAIN}/application/o/rallly/.well-known/openid-configuration
+      OIDC_CLIENT_ID: rallly
+      OIDC_CLIENT_SECRET: ${RALLLY_OIDC_CLIENT_SECRET}
+      # Feature #1 (image du fork) : vote réservé aux comptes OIDC, sous l'identité de l'IdP
+      OIDC_VOTE_REQUIRED: "true"
+      # Lu une seule fois au lancement de Node, d'où la dépendance sur caddy-ca
+      NODE_EXTRA_CA_CERTS: /caddy-ca/root.crt
+    volumes:
+      - caddy-ca:/caddy-ca:ro
+    depends_on:
+      rallly-db:
+        condition: service_healthy
+      caddy-ca:
+        condition: service_completed_successfully
+      # Si la discovery OIDC échoue, Better Auth ignore le provider (« Provider skipped »)
+      authentik-server:
+        condition: service_healthy
+    networks: [edge, rallly-internal]
+
+  mailpit:
+    <<: *hardening
+    image: docker.io/axllent/mailpit:v1.33
+    user: "1000:1000"
+    read_only: true
+    tmpfs: [/tmp]
+    networks: [edge]
+
+networks:
+  edge:
+  authentik-internal:
+    internal: true
+  rallly-internal:
+    internal: true
+
+volumes:
+  caddy-data:
+  caddy-config:
+  caddy-ca:
+  authentik-db:
+  authentik-data:
+  rallly-db:
