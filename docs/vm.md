@@ -38,7 +38,8 @@ cd /opt/projet-infra
 # 1re fois : .env propre à la VM, secrets générés sur place (jamais copiés depuis un poste)
 IP=$(hostname -I | awk '{print $1}')
 ./scripts/init-env.sh "${IP//./-}.sslip.io"
-echo "RALLLY_IMAGE=ghcr.io/les-salopards/rallly:<tag>" >> .env   # image du fork publiée par la CI
+# Dès que la CI du fork a publié l'image (sinon : image upstream, sans les features)
+echo "RALLLY_IMAGE=ghcr.io/les-salopards/rallly:<tag>" >> .env
 ./deploy/deploy.sh
 ```
 Le mot de passe des comptes de démo (`DEMO_PASSWORD`) et celui d'`akadmin` (`AUTHENTIK_BOOTSTRAP_PASSWORD`) sont dans ce

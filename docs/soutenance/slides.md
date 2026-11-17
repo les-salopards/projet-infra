@@ -132,7 +132,7 @@ rejouer la requête dans les DevTools → `loginRequired` / `notMember`
 Raph (#1) puis Eliott (feature libre). DÉMO 2 (3 min) :
 1. invité → bandeau, pas de formulaire ; requête rejouée → loginRequired
 2. alice vote sous son identité IdP
-3. sondage réservé à rallly-users : bob → « votre compte n'en fait pas partie » ; alice → vote OK
+3. sondage réservé à rallly-users, créé par alice : bob → « votre compte n'en fait pas partie » ; le compte invité à la démo 1 → vote OK
 -->
 
 ---
@@ -168,7 +168,7 @@ Eliott.
 | Rallly | 0 | 6 HIGH, toutes dans le CLI `npm` embarqué, pas dans l'app |
 | Caddy, Mailpit | 0 | RAS |
 
-- Risques acceptés dans `.trivyignore` **avec date d'expiration** → la CI repasse au rouge pour réévaluer
+- Risques acceptés dans `.trivyignore.yaml`, **limités à un paquet et avec date d'expiration** → la CI repasse au rouge pour réévaluer
 - gitleaks sur tout l'historique : aucun secret
 
 <!-- Eliott. 7 CRITICAL au premier scan (6 oct.), 2 aujourd'hui, toutes deux justifiées. -->

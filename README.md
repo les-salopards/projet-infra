@@ -3,7 +3,7 @@
 Projet M2 « Dev avec Docker » : un environnement local **et** sur VM, derrière un reverse proxy, avec
 **Authentik** comme fournisseur d'identité (OIDC) et **Rallly** (sondages de dates) comme application.
 
-- Code des features Rallly : fork https://github.com/les-salopards/rallly (image publiée sur GHCR par sa CI).
+- Code des features Rallly : fork https://github.com/les-salopards/rallly (l'image est destinée à GHCR, publiée par la CI du fork).
 - Ce dépôt : la stack Compose, la configuration Authentik (déclarative), le déploiement sur la VM, le durcissement et le scan.
 
 ## Démarrage
@@ -47,35 +47,7 @@ Mot de passe = `DEMO_PASSWORD` du `.env` (`grep ^DEMO_PASSWORD= .env`).
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  user([Navigateur]) -- "HTTPS 443<br/>(seuls ports publiés : 80/443)" --> caddy
-
-  subgraph edge["réseau edge"]
-    caddy["Caddy<br/>reverse proxy, TLS interne<br/>alias auth.DOMAIN"]
-    aks["authentik-server"]
-    akw["authentik-worker<br/>(blueprints)"]
-    rallly["Rallly<br/>(image du fork)"]
-    mailpit["Mailpit<br/>SMTP de lab"]
-  end
-  subgraph ai["authentik-internal (internal : sans Internet)"]
-    adb[("authentik-db<br/>Postgres 18")]
-  end
-  subgraph ri["rallly-internal (internal : sans Internet)"]
-    rdb[("rallly-db<br/>Postgres 18")]
-  end
-
-  caddy -- "auth.DOMAIN" --> aks
-  caddy -- "rallly.DOMAIN" --> rallly
-  caddy -- "mail.DOMAIN" --> mailpit
-  rallly -- "OIDC par l'URL publique<br/>https://auth.DOMAIN (via Caddy)" --> caddy
-  aks --- adb
-  akw --- adb
-  rallly --- rdb
-  akw -- SMTP --> mailpit
-  rallly -- SMTP --> mailpit
-  ca["caddy-ca (one-shot)<br/>copie la CA racine"] -. "volume caddy-ca (ro)<br/>NODE_EXTRA_CA_CERTS" .-> rallly
-```
+![Architecture : Caddy seul point d'entrée, réseaux edge / authentik-internal / rallly-internal](docs/img/architecture.svg)
 
 | Élément | Choix |
 | --- | --- |
