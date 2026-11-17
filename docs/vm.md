@@ -35,9 +35,17 @@ ssh root@<IP> 'LOCK_ROOT=1 bash -s' < deploy/bootstrap-vm.sh   # puis couper le 
 ```sh
 ssh deploy@<IP>
 cd /opt/projet-infra
-cp .env.example .env && nano .env    # 1re fois : secrets + DOMAIN (voir §4)
+# 1re fois : .env propre à la VM, secrets générés sur place (jamais copiés depuis un poste)
+IP=$(hostname -I | awk '{print $1}')
+sed -E "s/^([A-Z_]+)=$/\1=PLACEHOLDER/" .env.example > .env
+while grep -q PLACEHOLDER .env; do sed -i "0,/PLACEHOLDER/s//$(openssl rand -base64 36 | tr -d '\n/+=')/" .env; done
+sed -i "s/^DOMAIN=.*/DOMAIN=${IP//./-}.sslip.io/" .env
+echo "RALLLY_IMAGE=ghcr.io/les-salopards/rallly:<tag>" >> .env   # image du fork publiée par la CI
+chmod 600 .env
 ./deploy/deploy.sh
 ```
+Le mot de passe des comptes de démo (`DEMO_PASSWORD`) et celui d'`akadmin` (`AUTHENTIK_BOOTSTRAP_PASSWORD`) sont dans ce
+`.env` : `grep -E '^(DEMO|AUTHENTIK_BOOTSTRAP)_PASSWORD' .env`.
 `deploy.sh` enchaîne : `git pull` → `docker compose config` → `pull` → `up -d --wait` → smoke tests
 (discovery OIDC d'Authentik, `/api/status` de Rallly) → liste des ports publiés (attendu : 80 et 443 seulement).
 
@@ -45,14 +53,18 @@ cp .env.example .env && nano .env    # 1re fois : secrets + DOMAIN (voir §4)
 | Élément | Local | VM | Pourquoi |
 | --- | --- | --- | --- |
 | `DOMAIN` | `localhost` (`auth.localhost`, `rallly.localhost`) | `<IP-avec-tirets>.sslip.io` (ex. `10-0-12-34.sslip.io`) | La VM n'a pas de DNS public. sslip.io renvoie l'IP privée contenue dans le nom, joignable via NetBird, sans fichier hosts. |
-| Redirect URI Authentik | `https://rallly.localhost/api/auth/callback/oidc` | `https://rallly.<DOMAIN>/api/auth/callback/oidc` | Doit correspondre exactement à `NEXT_PUBLIC_BASE_URL` ; à mettre à jour dans le provider Authentik. |
-| Images Rallly | build local possible | `ghcr.io/les-salopards/rallly:<tag>` | La VM ne build jamais : elle déploie ce que la CI a testé et scanné. |
+| Redirect URI Authentik | `https://rallly.localhost/api/auth/callback/oidc` | `https://rallly.<DOMAIN>/api/auth/callback/oidc` | Construite par le blueprint à partir de `DOMAIN` (`!Format`), comme `NEXT_PUBLIC_BASE_URL` dans le Compose : **rien à modifier à la main**. |
+| Images Rallly | `RALLLY_IMAGE` absent : image upstream `lukevella/rallly:4.17` | `RALLLY_IMAGE=ghcr.io/les-salopards/rallly:<tag>` | La VM ne build jamais : elle déploie ce que la CI a testé et scanné. Sans l'image du fork, `OIDC_VOTE_REQUIRED` et le sondage réservé à un groupe sont ignorés. |
+| Ressources | poste de dev | 4 vCPU / 8 Go | Authentik (server + worker) et Rallly sont les plus gourmands ; la stack complète démarre en ~2 min. |
 | Secrets | `.env` local | `.env` sur la VM (`chmod 600`) | Jamais dans Git ; chaque environnement a les siens. |
 | TLS | `tls internal` (CA Caddy) | identique | Pas de Let's Encrypt possible sans IP publique. Le formateur doit accepter le certificat ou importer la CA Caddy. |
 
 ## 5. Accès formateur
 - VPN NetBird Énov actif, puis `https://rallly.<DOMAIN>` et `https://auth.<DOMAIN>`.
-- Comptes de démo : voir la doc Authentik (Raph).
+- Comptes de démo `alice` / `bob` / `charlie` : voir [docs/authentik.md](authentik.md#comptes-de-démo) ; mot de passe
+  communiqué au formateur à part (jamais dans le dépôt).
+- Certificat : la CA interne de Caddy s'exporte avec
+  `docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt caddy-root.crt`, à importer dans le navigateur.
 - En secours : partage d'écran depuis un poste de l'équipe connecté au VPN.
 
 ## 6. Déploiement depuis la CI
@@ -64,3 +76,7 @@ Option si le temps le permet : un runner GitHub self-hosted installé sur la VM,
 - **sshd par socket (Ubuntu 24.04)** : `/run/sshd` n'existe pas tant qu'aucune connexion n'a eu lieu, donc `sshd -t` échoue. Le script crée le dossier.
 - **`start-limit-hit` de Docker** : des `systemctl restart docker` en rafale bloquent le service. Le script ne redémarre que si `daemon.json` change.
 - **Docker contourne ufw** : un port publié par Docker est ouvert même si ufw l'interdit. La vraie protection, c'est de ne publier que 80/443 dans le Compose.
+- **À surveiller : résolveur DNS qui filtre les IP privées** (protection anti « DNS rebinding » de certaines box et de
+  certains DNS d'entreprise) : `rallly.10-0-12-34.sslip.io` ne résout alors pas. Contournement côté poste client :
+  `echo "<IP> rallly.<DOMAIN> auth.<DOMAIN> mail.<DOMAIN>" | sudo tee -a /etc/hosts`. À l'intérieur de la VM, rien à faire :
+  Rallly joint `auth.<DOMAIN>` par l'alias réseau Docker de Caddy, sans DNS externe.

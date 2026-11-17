@@ -49,4 +49,8 @@ log "Ports publiés sur l'hôte (attendu : 80 et 443 uniquement)"
 docker compose ps --format '{{.Service}}\t{{.Ports}}' | grep -E '0\.0\.0\.0|\[::\]' || true
 
 docker image prune -f >/dev/null
-[ "$status" = 0 ] && log "Déploiement OK" || fail "Smoke test en échec : docker compose logs --tail 100"
+if [ "$status" = 0 ]; then
+  log "Déploiement OK : https://${RALLLY_HOST} et https://${AUTH_HOST} (VPN NetBird actif)"
+else
+  fail "Smoke test en échec : docker compose logs --tail 100"
+fi
