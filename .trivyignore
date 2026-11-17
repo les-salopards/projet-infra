@@ -1,0 +1,10 @@
+# Risques CRITICAL acceptés, avec leur justification dans docs/security.md (section « Résultats commentés »).
+# Chaque entrée expire : passé la date, Trivy la signale à nouveau et la CI repasse au rouge.
+
+# postgres:18-alpine, stdlib Go de /usr/local/bin/gosu : gosu n'est exécuté que si l'entrypoint démarre en root,
+# or les deux bases tournent avec user: postgres. gosu ne fait aucun appel réseau (CVE sur la reprise de session TLS).
+CVE-2025-68121 exp:2027-01-31
+
+# ghcr.io/goauthentik/server:2026.8.5, libbrotli1 (Debian) : pas de correctif dans la dernière image publiée.
+# Authentik n'est joignable que via Caddy, depuis le VPN Énov. À retirer à la prochaine image Authentik.
+CVE-2026-111497 exp:2026-12-31

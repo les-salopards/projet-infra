@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Scan de sécurité de la stack, sans rien installer : chaque outil tourne dans un conteneur.
-#   ./scripts/scan.sh                 # images du Compose + config + Dockerfiles + secrets
+#   ./scripts/scan.sh                 # images du Compose + durcissement du Compose + Dockerfiles + secrets
 #   ./scripts/scan.sh image1 image2   # seulement ces images
 # Rapports : reports/ (gitignoré). Commentaires des résultats : docs/security.md.
-# Code de sortie ≠ 0 si une CVE CRITICAL corrigeable ou un secret est trouvé (utilisable en CI).
+# Code de sortie ≠ 0 si une CVE CRITICAL corrigeable non acceptée (.trivyignore), une règle de durcissement
+# violée ou un secret est trouvé (utilisable en CI).
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
@@ -56,11 +57,15 @@ print(c["CRITICAL"], c["HIGH"])' < "reports/image-${safe}.json")"
   [ "$crit" -gt 0 ] && status=1
 done
 
-echo "== Config (Compose, Dockerfiles) : erreurs de configuration"
-trivy config --quiet --severity "$SEVERITY" --format table --output /reports/config.txt . \
-  && echo "   reports/config.txt"
+# trivy config ne sait pas lire un fichier Compose : les règles sont vérifiées sur le Compose résolu.
+echo "== Durcissement du Compose (scripts/check-compose.py)"
+if [ -f .env ] && docker compose config --format json > reports/compose.json 2>/dev/null; then
+  python3 scripts/check-compose.py < reports/compose.json || status=1
+else
+  echo "   ERREUR : docker compose config a échoué (.env complet ?)"; status=1
+fi
 
-echo "== Dockerfiles (hadolint)"
+echo "== Dockerfiles (hadolint ; l'image Rallly est construite et scannée dans le fork)"
 find . -name 'Dockerfile*' -not -path './node_modules/*' -not -path './.git/*' | while read -r f; do
   docker run --rm -i "$HADOLINT" < "$f" > "reports/hadolint-$(echo "$f" | tr '/.' '__').txt" \
     && echo "   ok  $f" || echo "   avertissements : $f (voir reports/)"

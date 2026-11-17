@@ -1,10 +1,11 @@
-# Scan de sécurité réutilisable : le même ./scripts/scan.sh qu'en local.
-# Appelé par la CI principale après le build/push de l'image :
+# Scan de sécurité : le même ./scripts/scan.sh qu'en local.
+# Tourne à chaque push sur main et sur chaque PR (images du Compose, durcissement du Compose, secrets).
+# Réutilisable depuis la CI du fork, après le build/push de l'image :
 #
 #   jobs:
 #     scan:
 #       needs: build
-#       uses: ./.github/workflows/security-scan.yml
+#       uses: les-salopards/projet-infra/.github/workflows/security-scan.yml@main
 #       with:
 #         images: ghcr.io/les-salopards/rallly:${{ github.sha }}
 #
@@ -12,6 +13,9 @@
 name: security-scan
 
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_call:
     inputs:
       images:
@@ -32,6 +36,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
+          # Appelé depuis le fork, checkout prendrait le dépôt appelant : on force celui qui porte scan.sh
+          repository: les-salopards/projet-infra
           fetch-depth: 0 # gitleaks parcourt tout l'historique
 
       - name: Connexion à GHCR (images privées éventuelles)
@@ -48,7 +54,9 @@ jobs:
         env:
           IMAGES: ${{ inputs.images }}
         run: |
-          [ -f .env ] || cp .env.example .env 2>/dev/null || true
+          # Valeurs factices : docker compose config refuse les secrets vides (${VAR:?}), et sans config résolue
+          # la liste des images à scanner serait vide.
+          [ -f .env ] || sed -E 's/^([A-Z_]+)=$/\1=ci-factice-0123456789abcdef0123456789/' .env.example > .env
           # shellcheck disable=SC2086
           ./scripts/scan.sh $IMAGES
 
