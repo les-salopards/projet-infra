@@ -37,11 +37,8 @@ ssh deploy@<IP>
 cd /opt/projet-infra
 # 1re fois : .env propre à la VM, secrets générés sur place (jamais copiés depuis un poste)
 IP=$(hostname -I | awk '{print $1}')
-sed -E "s/^([A-Z_]+)=$/\1=PLACEHOLDER/" .env.example > .env
-while grep -q PLACEHOLDER .env; do sed -i "0,/PLACEHOLDER/s//$(openssl rand -base64 36 | tr -d '\n/+=')/" .env; done
-sed -i "s/^DOMAIN=.*/DOMAIN=${IP//./-}.sslip.io/" .env
+./scripts/init-env.sh "${IP//./-}.sslip.io"
 echo "RALLLY_IMAGE=ghcr.io/les-salopards/rallly:<tag>" >> .env   # image du fork publiée par la CI
-chmod 600 .env
 ./deploy/deploy.sh
 ```
 Le mot de passe des comptes de démo (`DEMO_PASSWORD`) et celui d'`akadmin` (`AUTHENTIK_BOOTSTRAP_PASSWORD`) sont dans ce
