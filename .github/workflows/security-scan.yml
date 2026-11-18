@@ -4,10 +4,10 @@
 #
 #   jobs:
 #     scan:
-#       needs: build
+#       needs: image
 #       uses: les-salopards/projet-infra/.github/workflows/security-scan.yml@main
 #       with:
-#         images: ghcr.io/les-salopards/rallly:${{ github.sha }}
+#         images: ghcr.io/les-salopards/rallly:sha-<sha court>   # voir image.yml du fork
 #
 # Sans `images`, scanne toutes les images du Compose.
 name: security-scan
