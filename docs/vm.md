@@ -11,8 +11,9 @@ Source : [documentation publique Énov](https://github.com/Enov-Salle-Serveur/Do
 | Compte | [enov.icu](https://enov.icu) | Adresse **@ynov.com**, code de vérification reçu par mail. |
 | VPN | [netbird.enov.icu:4443](https://netbird.enov.icu:4443/) (la doc affiche aussi `netbird.enov.vaultaire.fr:4443`) → *Sign in with Keycloak* | Mêmes identifiants qu'enov.icu. Installer le client NetBird (`brew install netbirdio/tap/netbird` sur macOS) et l'activer. |
 | Clé SSH | [nebula.cloud.enov.local:2616](http://nebula.cloud.enov.local:2616) → profil → *Settings* → *Add SSH Key* | Le domaine `.enov.local` ne résout **que VPN actif**. Clé : `ssh-keygen -t ed25519`, coller le `.pub`. **Avant** de créer la VM, sinon pas d'accès. |
-| VM | Nebula → *Template* → le seul template → *Instantiate* | Nom : `projet-infra`. Prévoir **4 vCPU / 8 Go RAM** (Authentik + Rallly + 2 Postgres). *Advanced* → *Network* → *Attach NIC* → le seul réseau. |
-| Connexion | `ssh root@<IP>` | L'IP s'affiche dans l'onglet des instances. |
+| VM | Nebula → *Template* → template **Ubuntu 24.04** (il y en a plusieurs) → *Instantiate* | Nom : `projet-infra`. **4 vCPU / 4 Go RAM minimum** : avec la RAM par défaut, la VM ne démarre pas (*out of memory* dans la console VNC, SSH injoignable). *Advanced* → *Network* → *Attach NIC* → le seul réseau. |
+| Disque | Nebula → VM → *Storage* → *Resize* | Le disque du template fait **4 Go** : trop petit pour les images (~3,8 Go). Le passer à **19 Go** (quota : 20 000 Mo par personne). La partition s'agrandit seule au redémarrage. |
+| Connexion | `ssh root@<IP>` | L'IP s'affiche dans l'onglet des instances. **Pas de mot de passe** : connexion par clé uniquement (la console VNC ne sert qu'à voir le démarrage). |
 
 Les réglages MTU 1450 de la doc Énov ne concernent qu'un LAN personnel : **ne pas les appliquer** ici.
 
@@ -27,6 +28,7 @@ ssh root@<IP> 'LOCK_ROOT=1 bash -s' < deploy/bootstrap-vm.sh   # puis couper le 
 - installe Docker Engine et le plugin Compose depuis le dépôt officiel ;
 - crée l'utilisateur `deploy` (groupe docker) avec les clés SSH de root ;
 - configure le pare-feu (22, 80, 443) et SSH par clé uniquement ;
+- configure un DNS public si la VM n'en a pas (cas du template Énov) et ajoute 2 Go de swap sous 6 Go de RAM ;
 - active les mises à jour de sécurité automatiques ;
 - configure le démon Docker : `no-new-privileges` par défaut et rotation des logs ;
 - clone le dépôt dans `/opt/projet-infra`.
@@ -73,6 +75,14 @@ Option si le temps le permet : un runner GitHub self-hosted installé sur la VM,
 ## Pièges rencontrés
 - **sshd par socket (Ubuntu 24.04)** : `/run/sshd` n'existe pas tant qu'aucune connexion n'a eu lieu, donc `sshd -t` échoue. Le script crée le dossier.
 - **`start-limit-hit` de Docker** : des `systemctl restart docker` en rafale bloquent le service. Le script ne redémarre que si `daemon.json` change.
+- **RAM et disque du template** : RAM par défaut trop faible (*out of memory* au boot), disque de 4 Go. Le *Resize*
+  de la RAM échoue VM allumée (`virsh setmem`) : *Power Off Hard* (une VM plantée reste bloquée en
+  `SHUTDOWN_POWEROFF` sinon), attendre `POWEROFF`, puis *Resize*. Le plus simple : recréer la VM avec les bons réglages.
+- **Pas de DNS sur la VM** : Internet joignable par IP, mais aucun nom ne résout ; les résolveurs du réseau Énov ne
+  répondent pas. `bootstrap-vm.sh` ajoute 1.1.1.1 / 9.9.9.9 dans `systemd-resolved`.
+- **Image GHCR privée par défaut** : `docker pull` répond `unauthorized` sur la VM. Passer le package en *Public*
+  (org → *Packages* → `rallly` → *Package settings* → *Change visibility*).
+- **Session NetBird** : elle expire au bout de 24 h ; relancer `netbird up` (le jour de la démo aussi).
 - **Docker contourne ufw** : un port publié par Docker est ouvert même si ufw l'interdit. La vraie protection, c'est de ne publier que 80/443 dans le Compose.
 - **À surveiller : résolveur DNS qui filtre les IP privées** (protection anti « DNS rebinding » de certaines box et de
   certains DNS d'entreprise) : `rallly.10-0-12-34.sslip.io` ne résout alors pas. Contournement côté poste client :

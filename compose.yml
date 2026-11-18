@@ -26,6 +26,14 @@ x-authentik: &authentik
   # Rien n'est écrit hors de /data (volume) et /dev/shm (shm_size) : testé SSO, policies, blueprint, e-mail
   read_only: true
   tmpfs: ["/tmp:size=64m"]
+  # Healthcheck de l'image (start_period 2 min) trop court pour le 1er démarrage sur la VM Énov : les migrations y
+  # prennent ~5 min et `up --wait` échoue. Le start_period ne retarde rien : healthy dès le premier test réussi.
+  healthcheck:
+    test: ["CMD", "ak", "healthcheck"]
+    interval: 15s
+    timeout: 30s
+    retries: 3
+    start_period: 10m
   environment:
     AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?voir .env.example}
     AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:?voir .env.example}
