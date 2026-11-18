@@ -21,8 +21,11 @@ x-postgres: &postgres
 
 x-authentik: &authentik
   <<: *hardening
-  image: ghcr.io/goauthentik/server:2026.8.3
+  image: ghcr.io/goauthentik/server:2026.8.5
   shm_size: 512mb
+  # Rien n'est écrit hors de /data (volume) et /dev/shm (shm_size) : testé SSO, policies, blueprint, e-mail
+  read_only: true
+  tmpfs: ["/tmp:size=64m"]
   environment:
     AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?voir .env.example}
     AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:?voir .env.example}
@@ -144,6 +147,13 @@ services:
       OIDC_VOTE_REQUIRED: "true"
       # Lu une seule fois au lancement de Node, d'où la dépendance sur caddy-ca
       NODE_EXTRA_CA_CERTS: /caddy-ca/root.crt
+    read_only: true
+    # Seuls chemins écrits par l'image : cache Next.js et cache jiti de Prisma (migrations au démarrage).
+    # tmpfs en mode 1777 par défaut : fonctionne quel que soit l'uid de l'image (upstream ou fork)
+    tmpfs:
+      - /tmp:size=64m
+      - /app/apps/web/.next/cache:size=256m
+      - /app/node_modules/.cache:size=32m
     volumes:
       - caddy-ca:/caddy-ca:ro
     depends_on:

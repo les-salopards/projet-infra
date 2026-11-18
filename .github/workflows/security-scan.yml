@@ -1,0 +1,68 @@
+# Scan de sécurité : le même ./scripts/scan.sh qu'en local.
+# Tourne à chaque push sur main et sur chaque PR (images du Compose, durcissement du Compose, secrets).
+# Réutilisable depuis la CI du fork, après le build/push de l'image :
+#
+#   jobs:
+#     scan:
+#       needs: build
+#       uses: les-salopards/projet-infra/.github/workflows/security-scan.yml@main
+#       with:
+#         images: ghcr.io/les-salopards/rallly:${{ github.sha }}
+#
+# Sans `images`, scanne toutes les images du Compose.
+name: security-scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+    inputs:
+      images:
+        description: Images à scanner, séparées par des espaces (vide = images du Compose)
+        type: string
+        default: ""
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1" # chaque lundi : nouvelles CVE sur des images inchangées
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Appelé depuis le fork, checkout prendrait le dépôt appelant : on force celui qui porte scan.sh
+          repository: les-salopards/projet-infra
+          fetch-depth: 0 # gitleaks parcourt tout l'historique
+
+      - name: Connexion à GHCR (images privées éventuelles)
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Cache base de CVE Trivy
+        uses: actions/cache@v4
+        with:
+          path: .trivy-cache
+          key: trivy-db-${{ github.run_id }}
+          restore-keys: trivy-db-
+
+      - name: Scan
+        env:
+          IMAGES: ${{ inputs.images }}
+        run: |
+          # Valeurs factices : docker compose config refuse les secrets vides (${VAR:?}), et sans config résolue
+          # la liste des images à scanner serait vide.
+          [ -f .env ] || sed -E 's/^([A-Z_]+)=$/\1=ci-factice-0123456789abcdef0123456789/' .env.example > .env
+          # shellcheck disable=SC2086
+          ./scripts/scan.sh $IMAGES
+
+      - name: Rapports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: reports/
