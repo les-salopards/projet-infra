@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 fail() { printf '\033[1;31m!!\033[0m %s\n' "$*" >&2; exit 1; }
 
-[ -f .env ] || fail ".env absent : cp .env.example .env puis remplir les secrets."
+[ -f .env ] || fail ".env absent : ./scripts/init-env.sh <IP-avec-tirets>.sslip.io (voir docs/vm.md)."
 
 # DOMAIN et les sous-domaines viennent du même .env que le Compose.
 set -a; . ./.env; set +a

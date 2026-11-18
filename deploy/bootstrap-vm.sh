@@ -138,4 +138,4 @@ chown -R "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR"
 
 log "Terminé. Étape suivante :"
 echo "  ssh ${DEPLOY_USER}@<IP>"
-echo "  cd ${APP_DIR} && cp .env.example .env && \$EDITOR .env && ./deploy/deploy.sh"
+echo "  cd ${APP_DIR} && ./scripts/init-env.sh <IP-avec-tirets>.sslip.io && ./deploy/deploy.sh"

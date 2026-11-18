@@ -27,7 +27,8 @@ Pour l'éviter, importer la CA dans le magasin de certificats du poste :
 `docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt caddy-root.crt`.
 
 Par défaut, Rallly tourne avec l'image officielle (`lukevella/rallly:4.17`), qui ignore nos features.
-Pour la démo des features : `RALLLY_IMAGE=ghcr.io/les-salopards/rallly:<tag>` dans le `.env`, puis `docker compose up -d`.
+Pour la démo des features : `RALLLY_IMAGE=ghcr.io/les-salopards/rallly:latest` dans le `.env` (image publiée par la CI
+du fork à chaque merge sur `main`), puis `docker compose up -d`.
 
 Vérifier que tout est sain :
 ```sh
@@ -78,6 +79,18 @@ Détails, captures et scénarios de démo : [docs/authentik.md](docs/authentik.m
 | --- | --- | --- | --- |
 | Vote verrouillé par OAuth | catalogue #1 | [docs/specs/oauth-locked-vote.md](docs/specs/oauth-locked-vote.md) | `OIDC_VOTE_REQUIRED=true` (déjà dans le Compose) |
 | Sondage réservé à un groupe Authentik | **feature libre** | [docs/specs/group-restricted-poll.md](docs/specs/group-restricted-poll.md) | champ « Réserver à un groupe » dans les réglages du sondage |
+| Vue calendrier pour répondre | catalogue #7 | [docs/specs/calendar-vote-view.md](docs/specs/calendar-vote-view.md) | bascule « Tableau / Calendrier » sur la page du sondage |
+
+### Catalogue #7 : vue calendrier pour répondre
+Une bascule **Tableau / Calendrier** sur la page de vote. Le calendrier est une grille mensuelle où chaque jour affiche
+ses créneaux horaires (3 visibles, puis « +N autres ») ; un clic fait tourner le vote (oui → si besoin → non).
+Il écrit dans **le même formulaire que le tableau** : on peut changer de vue en cours de réponse sans rien perdre, et
+l'enregistrement passe par les mêmes actions serveur, donc par les verrous de la #1 et de la feature libre.
+Rallly n'avait qu'une vue calendrier expérimentale, limitée aux journées entières et absente de la page de vote réelle.
+
+| Détail d'un jour chargé | Tableau avant enregistrement (votes saisis dans le calendrier) |
+| --- | --- |
+| ![Calendrier](docs/img/feature7-calendrier-detail-jour.png) | ![Tableau](docs/img/feature7-tableau-avant-enregistrement.png) |
 
 ### Feature libre : sondage réservé à un groupe Authentik
 **Problème** : un sondage Rallly est ouvert à toute personne qui a le lien. Dans une organisation, on veut souvent
@@ -95,8 +108,11 @@ l'annuaire existe déjà dans Authentik.
 Hors périmètre : un seul groupe par sondage, nom saisi à la main, retrait d'un groupe effectif à la reconnexion suivante.
 
 ## CI/CD et sécurité
-- **Fork Rallly** : image construite par le Dockerfile multi-stage du fork (utilisateur non-root, `apt-get upgrade` dans
-  l'étape `runner`) ; la VM tire cette image depuis GHCR (workflow de publication : voir le fork).
+- **Fork Rallly** : workflow [`image.yml`](https://github.com/les-salopards/rallly/blob/main/.github/workflows/image.yml).
+  Sur chaque PR : lint (Biome et contrôles upstream), type-check, tests unitaires, build de l'image. Sur `main` : en plus,
+  push sur `ghcr.io/les-salopards/rallly` (`sha-<commit>` et `latest`) puis scan de l'image avec le `security-scan.yml`
+  de ce dépôt. Image : Dockerfile multi-stage du fork (utilisateur non-root, `apt-get upgrade` dans l'étape `runner`).
+  La VM ne build rien, elle tire cette image. Spec : [docs/specs/fork-ci.md](docs/specs/fork-ci.md).
 - **Ce dépôt** : [`security-scan.yml`](.github/workflows/security-scan.yml) lance `./scripts/scan.sh` à chaque push sur
   `main` et sur chaque PR : CVE des images (Trivy), règles de durcissement du Compose, secrets dans l'historique (gitleaks).
 - **Durcissement** : tous les conteneurs en non-root, `cap_drop: ALL`, `no-new-privileges`, système de fichiers en lecture
