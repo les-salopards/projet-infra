@@ -5,13 +5,15 @@
 
 ## La veille (sur la VM, VPN actif)
 - [ ] `ssh deploy@<IP> 'cd /opt/projet-infra && ./deploy/deploy.sh'` → « Déploiement OK », ports 80/443 seulement
-- [ ] `RALLLY_IMAGE` du `.env` de la VM = le tag publié par la CI (image du fork avec les features)
+- [ ] Package GHCR `rallly` **public** (sinon la VM ne peut pas tirer l'image)
+- [ ] `RALLLY_IMAGE=ghcr.io/les-salopards/rallly:latest` dans le `.env` de la VM (image du fork avec les 3 features)
 - [ ] CA de Caddy importée dans le navigateur de démo (sinon avertissement à chaque page) : voir [docs/vm.md](../vm.md#5-accès-formateur)
 - [ ] Les 3 comptes se connectent : `alice` OK, `bob` OK, `charlie` refusé
 - [ ] Sondages de démo préparés **par `alice`** : un ouvert, et « Séminaire » réservé au groupe `rallly-users`
   (pas par `bob` : un organisateur passe outre la règle de groupe, il ne pourrait pas servir de contre-exemple)
+- [ ] Sondage **horaire** pour la #7, créé par `bob`, sur deux mois, avec un jour à 4 créneaux ; `alice` n'y a pas répondu
 - [ ] Mailpit vidé (`https://mail.<DOMAIN>`)
-- [ ] Capture du pipeline vert sur `main` insérée dans les slides
+- [x] Capture du pipeline vert sur `main` insérée dans les slides (`docs/img/ci-fork-main-vert.png`)
 - [ ] `./scripts/scan.sh` relancé : chiffres de la slide « Scan commenté » à jour
 - [ ] Répétition complète chronométrée, chacun sa partie
 
@@ -29,9 +31,10 @@
 | 0:00 | César | Titre, livré, architecture | Schéma : Caddy seul exposé, réseaux internal, URL publique pour l'OIDC |
 | 2:30 | Raph | Authentik | **Démo 1** : `alice` se connecte (SSO) ; `charlie` → *Permission denied* ; `bob` crée une invitation → lien → inscription → l'e-mail arrive dans Mailpit |
 | 5:30 | Eliott | Local et VM | Terminal VM : `docker compose ps`, même `compose.yml` ; seul `.env` diffère |
-| 6:30 | porteur CI | CI/CD | Run vert sur `main`, image dans GHCR |
+| 6:30 | César | CI/CD | Run vert sur `main` du fork (lint, tests, build, push, scan), image dans GHCR |
 | 7:30 | Raph puis Eliott | Features | **Démo 2** : invité → lecture seule, requête rejouée → `loginRequired` ; `alice` vote sous son identité IdP ; sondage réservé (créé par `alice`) : `bob` refusé (« votre compte n'en fait pas partie »), le compte invité à la démo 1 (groupe `rallly-users`) vote |
-| 11:30 | Eliott | Durcissement, scan, limites | Tableau vérifié dans les conteneurs ; 7 → 2 CRITICAL, risques acceptés qui expirent |
+| 10:30 | César | Catalogue #7 | **Démo 3** : `alice` sur le sondage horaire → Calendrier → vote dans la grille, « +1 autres », mois suivant → retour au Tableau avant d'enregistrer (votes présents) → Continuer |
+| 12:00 | Eliott | Durcissement, scan, limites | Tableau vérifié dans les conteneurs ; CRITICAL de la stack 7 → 2 (acceptées, expirent), image du fork 3 → 0 |
 | 14:30 | tous | Questions | |
 
 ## Si quelque chose casse
@@ -43,6 +46,8 @@
 | Invitation : pas d'e-mail | Le lien est aussi copiable depuis Admin → Annuaire → Invitations |
 
 ## Questions probables
+- *Rallly a déjà une vue calendrier ?* Seulement sur une page expérimentale et pour les journées entières ; la nôtre est
+  sur la vraie page de vote, gère les créneaux horaires et partage le formulaire du tableau (aucun nouveau chemin serveur).
 - *Pourquoi Caddy ?* TLS automatique (CA interne ici), config de 15 lignes, un bloc par application.
 - *Pourquoi l'URL publique d'Authentik depuis Rallly ?* L'issuer du jeton doit être identique pour le navigateur et pour Rallly.
 - *Comment prouvez-vous le refus côté serveur ?* Requête rejouée hors interface → `loginRequired` / `notMember`.
