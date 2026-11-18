@@ -43,7 +43,7 @@ Ordre proposé : César (architecture) → Raph (Authentik, feature #1) → Elio
 | Reverse proxy opérationnel | <span class="ok">✔</span> Caddy, point d'entrée unique, 80/443 seulement |
 | SSO Authentik → Rallly | <span class="ok">✔</span> OIDC, connexion uniquement via Authentik |
 | Policies par groupe + invitation externe | <span class="ok">✔</span> config 100 % déclarative (blueprint) |
-| Déploiement VM Énov cohérent avec le local | <span class="todo">à faire</span> scripts prêts ; même `compose.yml`, seuls `.env` et `DOMAIN` changent |
+| Déploiement VM Énov cohérent avec le local | <span class="ok">✔</span> `https://rallly.10-2-192-14.sslip.io` : même `compose.yml`, image du fork tirée de GHCR ; seuls `.env` et `DOMAIN` changent |
 | Pipeline CI/CD avec preuve verte | <span class="ok">✔</span> fork : lint, tests, build, push GHCR, scan · infra : scan de la stack |
 | Features | <span class="ok">✔</span> catalogue #1 + catalogue #7 + feature libre |
 
