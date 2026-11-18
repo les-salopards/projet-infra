@@ -208,7 +208,7 @@ Eliott.
 - **CVE sans correctif** non listées (`--ignore-unfixed`) ; les HIGH ne bloquent pas la CI, elles sont commentées
 - **Déploiement manuel** sur la VM (VPN) ; piste : runner self-hosted
 - **Features** : `OIDC_VOTE_REQUIRED` au niveau de l'instance ; groupes rafraîchis à la reconnexion ;
-  un compte peut encore ajouter deux réponses ; vue calendrier : semaine selon la langue, accessibilité perfectible
+  un compte peut encore ajouter deux réponses
 
 <!-- Eliott. Conclure : l'infra d'abord, reproductible, la même du poste à la VM. -->
 

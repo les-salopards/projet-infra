@@ -113,8 +113,13 @@ Code : fork, PR #5 (mergée dans `main`, CI verte). Plan : [docs/plans/2026-11-1
 | --- | --- | --- |
 | ![](../img/feature7-calendrier-detail-jour.png) | ![](../img/feature7-tableau-avant-enregistrement.png) | ![](../img/feature7-tableau-apres-modification.png) |
 
+## Points mineurs de la relecture (PR #7 du fork)
+Corrigés : « Annuler » proposé aussi pendant une nouvelle réponse ; premier jour de la semaine selon la préférence de
+l'utilisateur ; nom accessible des créneaux (date et heure complètes, vote, nombre de « oui ») ; une journée entière
+occupe toute la case ; clés de traduction dans l'ordre alphabétique. 4 tests d'intégration (`calendar-poll.test.tsx`)
+rendent la grille sur un vrai formulaire react-hook-form : le vote cliqué arrive dans le champ que lit le tableau.
+
 ## Limites assumées
-- Le premier jour de la semaine suit la langue, pas la préférence de l'utilisateur.
-- Le nom accessible d'un créneau ne contient pas la date ; le score n'est pas annoncé comme tel.
-- En mode « nouvelle réponse » pour quelqu'un qui a déjà répondu, l'annulation se fait depuis le tableau.
-- La bascule apparaît aussi sur la page organisateur (même composant de résultats) ; la vue choisie n'est pas mémorisée.
+- La bascule apparaît aussi sur la page organisateur (même composant de résultats ; l'organisateur peut aussi répondre).
+- En modification, le pied de formulaire propose « Refuser », comme la vue mobile (même composant).
+- La vue choisie n'est pas mémorisée entre deux visites.
