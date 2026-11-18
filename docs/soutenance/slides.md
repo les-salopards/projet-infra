@@ -14,6 +14,7 @@ style: |
   .todo { color: #c2410c; font-weight: 700; }
   section.title { justify-content: center; }
   img[alt~="center"] { display: block; margin: 0 auto; }
+  section.split ul { font-size: 22px; }
 ---
 
 <!-- _class: title -->
@@ -70,8 +71,7 @@ César.
 - **SSO** : Rallly ne connaît qu'un provider OIDC ; `EMAIL_LOGIN_ENABLED=false`
 - **Policies** : `rallly-users` et `rallly-admins` autorisés, tout autre compte refusé **par Authentik**, avant Rallly
 - **Invitation externe** : lien à usage unique → inscription → groupe `rallly-users`
-- **Tout est dans un blueprint** versionné (`authentik/blueprints/rallly.yaml`) : rien n'est cliqué à la main,
-  la même config s'applique en local et sur la VM
+- **Tout est dans un blueprint** versionné (`authentik/blueprints/rallly.yaml`) : rien n'est cliqué à la main, la même config s'applique en local et sur la VM
 
 | Compte | Groupe | Résultat |
 | --- | --- | --- |
@@ -105,9 +105,11 @@ Eliott.
 
 ---
 
+<!-- _class: split -->
+
 ## CI/CD
 
-![w:820 center](../img/ci-fork-main-vert.png)
+![bg right:46% contain](../img/ci-fork-main-vert.png)
 
 - **Fork** (`image.yml`) : chaque PR → lint, type-check, tests, build ; `main` → push **GHCR** (`sha-…`, `latest`) puis **scan**
 - **projet-infra** : `security-scan.yml` à chaque push et PR (images, règles du Compose, secrets) → appelé aussi par le fork
@@ -116,7 +118,7 @@ Eliott.
 
 <!--
 César.
-- Une seule chaîne : PR → CI verte → merge → image publiée → la VM tire `latest`. La VM ne build jamais.
+- Une seule chaîne : PR → CI verte → merge → image publiée → la VM tire l'image épinglée par son tag `sha-…` (`RALLLY_IMAGE` du .env). La VM ne build jamais.
 - Workflows upstream de Rallly désactivés (Docker Hub, release…) sans supprimer les fichiers : le fork reste propre pour l'upstream.
 - Anecdote utile : le premier run sur main était rouge, à cause du scan. On a monté Next.js plutôt que d'ignorer la CVE.
 - Montrer l'onglet Actions du fork, puis Packages (image GHCR).
@@ -207,8 +209,7 @@ Eliott.
 - **Images tierces épinglées par tag**, pas par digest
 - **CVE sans correctif** non listées (`--ignore-unfixed`) ; les HIGH ne bloquent pas la CI, elles sont commentées
 - **Déploiement manuel** sur la VM (VPN) ; piste : runner self-hosted
-- **Features** : `OIDC_VOTE_REQUIRED` au niveau de l'instance ; groupes rafraîchis à la reconnexion ;
-  un compte peut encore ajouter deux réponses
+- **Features** : `OIDC_VOTE_REQUIRED` au niveau de l'instance ; groupes rafraîchis à la reconnexion, et un compte peut encore ajouter deux réponses
 
 <!-- Eliott. Conclure : l'infra d'abord, reproductible, la même du poste à la VM. -->
 

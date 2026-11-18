@@ -9,7 +9,8 @@
 - [ ] `RALLLY_IMAGE=ghcr.io/les-salopards/rallly:latest` dans le `.env` de la VM (image du fork avec les 3 features)
 - [ ] CA de Caddy importée dans le navigateur de démo (sinon avertissement à chaque page) : voir [docs/vm.md](../vm.md#5-accès-formateur)
 - [ ] Les 3 comptes se connectent : `alice` OK, `bob` OK, `charlie` refusé
-- [ ] Sondages de démo préparés **par `alice`** : un ouvert, et « Séminaire » réservé au groupe `rallly-users`
+- [x] Sondages de démo préparés **par `alice`** : un ouvert, et « Séminaire » réservé au groupe `rallly-users`
+  (VM du 18/11 : « Réunion d'équipe » `/invite/7tcBVGU9BkQv`, « Séminaire » `/invite/OpgLFitygRyW`)
   (pas par `bob` : un organisateur passe outre la règle de groupe, il ne pourrait pas servir de contre-exemple)
 - [ ] Sondage **horaire** pour la #7, créé par `bob`, sur deux mois, avec un jour à 4 créneaux ; `alice` n'y a pas répondu
 - [ ] Mailpit vidé (`https://mail.<DOMAIN>`)
@@ -44,6 +45,8 @@
 | `rallly.<DOMAIN>` ne résout pas | VPN NetBird actif ? Sinon ligne dans `/etc/hosts` (voir [docs/vm.md](../vm.md#pièges-rencontrés)) |
 | VM injoignable | Basculer sur la stack locale d'un poste (`DOMAIN=localhost`, même image) : même démo |
 | Invitation : pas d'e-mail | Le lien est aussi copiable depuis Admin → Annuaire → Invitations |
+| Après connexion, le bandeau dit encore « Connectez-vous pour répondre » | Recharger la page (F5) : elle n'est pas rafraîchie au retour d'Authentik |
+| *Déconnexion* dans Rallly, mais on revient connecté sous le même compte | La session Authentik est toujours ouverte : se déconnecter aussi sur `https://auth.<DOMAIN>/flows/-/default/invalidation/`, ou changer de profil de navigateur (un compte par profil, comme prévu ci-dessus) |
 
 ## Questions probables
 - *Rallly a déjà une vue calendrier ?* Seulement sur une page expérimentale et pour les journées entières ; la nôtre est
