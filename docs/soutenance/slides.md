@@ -29,7 +29,8 @@ Groupe `les-salopards` : Raphaël · César · Eliott
 
 <!--
 15 min au total : ~8 min de slides, ~7 min de démo. Chacun présente sa partie.
-Ordre proposé : César (architecture) → Raph (Authentik, feature #1) → Eliott (VM, feature libre, sécurité) → CI.
+Ordre proposé : César (architecture) → Raph (Authentik, feature #1) → Eliott (VM, feature libre) → César (CI/CD, feature #7)
+→ Eliott (sécurité).
 -->
 
 ---
@@ -43,8 +44,8 @@ Ordre proposé : César (architecture) → Raph (Authentik, feature #1) → Elio
 | SSO Authentik → Rallly | <span class="ok">✔</span> OIDC, connexion uniquement via Authentik |
 | Policies par groupe + invitation externe | <span class="ok">✔</span> config 100 % déclarative (blueprint) |
 | Déploiement VM Énov cohérent avec le local | <span class="todo">à faire</span> scripts prêts ; même `compose.yml`, seuls `.env` et `DOMAIN` changent |
-| Pipeline CI/CD avec preuve verte | <span class="todo">à faire</span> build + scan + GHCR (fork) ; scan de la stack (infra) |
-| Features | <span class="ok">✔</span> catalogue #1 + feature libre · <span class="todo">2e feature catalogue</span> |
+| Pipeline CI/CD avec preuve verte | <span class="ok">✔</span> fork : lint, tests, build, push GHCR, scan · infra : scan de la stack |
+| Features | <span class="ok">✔</span> catalogue #1 + catalogue #7 + feature libre |
 
 <!-- Mettre à jour la colonne État la veille : VM, CI verte (capture), 2e feature catalogue. -->
 
@@ -106,13 +107,20 @@ Eliott.
 
 ## CI/CD
 
-- **Fork Rallly** : build de l'image (Dockerfile multi-stage, non-root), scan Trivy, push sur **GHCR**
-- **projet-infra** : `security-scan.yml` à chaque push et PR → même script qu'en local
-- Déploiement : la VM n'est joignable que par VPN → `deploy.sh` lancé sur la VM après publication de l'image
+![w:820 center](../img/ci-fork-main-vert.png)
 
-<span class="todo">Capture du pipeline vert sur `main` à insérer ici</span>
+- **Fork** (`image.yml`) : chaque PR → lint, type-check, tests, build ; `main` → push **GHCR** (`sha-…`, `latest`) puis **scan**
+- **projet-infra** : `security-scan.yml` à chaque push et PR (images, règles du Compose, secrets) → appelé aussi par le fork
+- **Le scan bloque vraiment** : 3 CVE critiques (Next.js, fast-xml-parser) → corrigées par une PR avant de repasser au vert
+- Déploiement : VM joignable seulement par VPN → `deploy.sh` sur la VM tire l'image publiée
 
-<!-- Porteur CI. Montrer l'onglet Actions : run vert sur main, image publiée dans Packages. -->
+<!--
+César.
+- Une seule chaîne : PR → CI verte → merge → image publiée → la VM tire `latest`. La VM ne build jamais.
+- Workflows upstream de Rallly désactivés (Docker Hub, release…) sans supprimer les fichiers : le fork reste propre pour l'upstream.
+- Anecdote utile : le premier run sur main était rouge, à cause du scan. On a monté Next.js plutôt que d'ignorer la CVE.
+- Montrer l'onglet Actions du fork, puis Packages (image GHCR).
+-->
 
 ---
 
@@ -133,6 +141,23 @@ Raph (#1) puis Eliott (feature libre). DÉMO 2 (3 min) :
 1. invité → bandeau, pas de formulaire ; requête rejouée → loginRequired
 2. alice vote sous son identité IdP
 3. sondage réservé à rallly-users, créé par alice : bob → « votre compte n'en fait pas partie » ; le compte invité à la démo 1 → vote OK
+-->
+
+---
+
+## Catalogue #7 — vue calendrier pour répondre
+
+![w:560](../img/feature7-calendrier-detail-jour.png) ![w:560](../img/feature7-tableau-avant-enregistrement.png)
+
+- Bascule **Tableau / Calendrier** ; grille mensuelle avec les **créneaux horaires dans les cases** (Rallly ne gère que les journées entières, et seulement sur une page expérimentale)
+- **Un seul formulaire** pour les deux vues : on vote dans le calendrier, la réponse est déjà dans le tableau
+- Même enregistrement, mêmes actions serveur → les verrous de la #1 et de la feature libre s'appliquent tels quels
+
+<!--
+César. DÉMO 3 (1 min 30) : alice ouvre le sondage horaire → Calendrier → vote dans la grille, « +1 autres »,
+mois suivant → retour au Tableau AVANT d'enregistrer : les votes sont là → Continuer.
+Fuseaux : les créneaux sont rangés par jour dans le fuseau du participant (23 h 30 UTC = lendemain à Paris).
+22 tests Vitest, relecture indépendante, démo jouée en read_only avec l'image du fork.
 -->
 
 ---
@@ -165,7 +190,8 @@ Eliott.
 | --- | --- | --- |
 | Authentik `2026.8.3 → 2026.8.5` | 5 → 1 | montée de version : PyJWT, certifi, anyio corrigés ; `libbrotli1` sans correctif, accepté (VPN) |
 | Postgres 18 | 1 | dans `gosu`, jamais exécuté avec `user: postgres` |
-| Rallly | 0 | 6 HIGH, toutes dans le CLI `npm` embarqué, pas dans l'app |
+| Rallly upstream | 0 | 6 HIGH, toutes dans le CLI `npm` embarqué, pas dans l'app |
+| Rallly **fork** (18/11) | 3 → 0 | Next.js 16.3.8 → 16.4.1, `fast-xml-parser` forcé en 5.7 : corrigé, pas ignoré |
 | Caddy, Mailpit | 0 | RAS |
 
 - Risques acceptés dans `.trivyignore.yaml`, **limités à un paquet et avec date d'expiration** → la CI repasse au rouge pour réévaluer
@@ -182,7 +208,7 @@ Eliott.
 - **CVE sans correctif** non listées (`--ignore-unfixed`) ; les HIGH ne bloquent pas la CI, elles sont commentées
 - **Déploiement manuel** sur la VM (VPN) ; piste : runner self-hosted
 - **Features** : `OIDC_VOTE_REQUIRED` au niveau de l'instance ; groupes rafraîchis à la reconnexion ;
-  un compte peut encore ajouter deux réponses
+  un compte peut encore ajouter deux réponses ; vue calendrier : semaine selon la langue, accessibilité perfectible
 
 <!-- Eliott. Conclure : l'infra d'abord, reproductible, la même du poste à la VM. -->
 
