@@ -4,6 +4,7 @@
 # Idempotent : on peut le relancer sans casser l'existant.
 #
 # Ce qu'il fait :
+#   0. DNS public si la VM n'en a pas, swap de 2 Go si moins de 6 Go de RAM ;
 #   1. installe Docker Engine + plugin Compose (dépôt officiel Docker) ;
 #   2. crée l'utilisateur non-root `deploy` (groupe docker) avec les clés SSH de root ;
 #   3. pare-feu : seuls 22, 80 et 443 entrants ;
@@ -29,6 +30,26 @@ case "${ID} ${ID_LIKE:-}" in
   *) echo "Distribution non gérée : ${ID}" >&2; exit 1 ;;
 esac
 log "Distribution : ${PRETTY_NAME} (${FAMILY})"
+
+# --- 0. DNS et swap (pièges des VM Énov) --------------------------------
+# Le template Énov ne fournit aucun DNS amont : la VM sort sur Internet par IP mais ne résout aucun nom
+# (apt, Docker Hub, GHCR). Les résolveurs du réseau Énov ne répondent pas : on passe par des DNS publics.
+if ! getent hosts download.docker.com >/dev/null 2>&1; then
+  log "DNS : aucun résolveur amont, ajout de 1.1.1.1 / 9.9.9.9"
+  mkdir -p /etc/systemd/resolved.conf.d
+  printf '[Resolve]\nDNS=1.1.1.1 9.9.9.9\nFallbackDNS=8.8.8.8\n' > /etc/systemd/resolved.conf.d/enov-dns.conf
+  systemctl restart systemd-resolved
+fi
+getent hosts download.docker.com >/dev/null || { echo "DNS toujours KO : vérifier /etc/resolv.conf" >&2; exit 1; }
+
+# Avec 4 Go de RAM, Authentik (server + worker) + Rallly + 2 Postgres tiennent juste : un swap de 2 Go évite
+# l'OOM killer au démarrage, quand tout s'initialise en même temps.
+MEM_MB=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
+if [ "$MEM_MB" -lt 6000 ] && [ -z "$(swapon --noheadings)" ]; then
+  log "Swap : ${MEM_MB} Mo de RAM, ajout d'un swapfile de 2 Go"
+  fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap -q /swapfile && swapon /swapfile
+  grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
 
 # --- 1. Docker -----------------------------------------------------------
 if ! command -v docker >/dev/null 2>&1; then

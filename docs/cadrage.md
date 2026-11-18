@@ -81,4 +81,4 @@ Rôle transverse de César : specs des features, relecture des PR, garant du REA
 | Durcissement, scan, doc VM, slides (La Tribe) | Fait (PR #3), CI `security-scan` verte |
 | CI/CD du fork (J4) | Fait : lint, tests, build, push GHCR, scan, vert sur `main` |
 | #1, feature libre, #7 | Mergées dans le fork, dans l'image `latest` |
-| VM Énov (J3) | À déployer avec l'image du fork |
+| VM Énov (J3) | Fait : `10.2.192.14`, image du fork `sha-d805601`, SSO et policies vérifiés depuis le VPN (PR #6) |
